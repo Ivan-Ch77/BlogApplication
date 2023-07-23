@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Post
+from .models import Post, Comment
 
 
 # About Django admin site   https://docs.djangoproject.com/en/4.1/ref/contrib/admin/
@@ -14,3 +14,9 @@ class PostAdmin(admin.ModelAdmin):
     raw_id_fields = ['author']  # author field displayed with a lookup widget
     date_hierarchy = 'publish'
     ordering = ['status', 'publish']
+
+@admin.register(Comment)
+class CommentAdmin(admin.ModelAdmin):
+    list_display = ['name', 'email', 'post', 'created', 'active']
+    list_filter = ['active', 'created', 'updated']
+    search_fields = ['name', 'email', 'body']
