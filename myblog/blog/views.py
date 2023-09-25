@@ -2,11 +2,14 @@ from django.shortcuts import render, get_object_or_404
 from .models import Post, Comment
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.views.generic import ListView
-from .forms import EmailPostForm, CommentForm
+from .forms import EmailPostForm, CommentForm, SearchForm
 from django.core.mail import send_mail
 from django.views.decorators.http import require_POST
 from taggit.models import Tag
 from django.db.models import Count
+from django.contrib.postgres.search import TrigramSimilarity
+# from django.contrib.postgres.search import SearchVector
+# from django.contrib.postgres.search import SearchVector, SearchQuery, SearchRank
 
 
 def post_list(request, tag_slug=None):
@@ -113,3 +116,33 @@ def post_comment(request, post_id):
                             {'post': post,
                              'form': form,
                              'comment': comment})
+
+
+def post_search(request):
+    form = SearchForm()  # Создание экземпляра формы
+    query = None
+    results = []
+    # Проверка наличия запроса в GET
+    if 'query' in request.GET:  # GET, а не POST, чтобы результирующий адрес содержал query и им было легко делиться
+        form = SearchForm(request.GET)  # Заполнение формы(создание экземпляра)
+        if form.is_valid():
+            query = form.cleaned_data['query']
+            # Первый вариант поиска
+            # search_vector = SearchVector('title', weight='A', config='russian') + \
+            #                 SearchVector('body', weight='B', config='russian')  # A и B - веса для поиска
+            # # config отвечает за выделение основ слов и удаление стоп-слов
+            # # Создание объекта SearchQuery, по которому фильтруются результаты
+            # search_query = SearchQuery(query, config='russian')
+            # results = Post.published.annotate(
+            #     search=search_vector,
+            #     rank=SearchRank(search_vector, search_query)  # SearchRank - упорядочивание результатов по релевантности
+            # ).filter(rank__gte=0.3).order_by('-rank')
+            # Второй вариант поиска(по триграммному сходству)
+            results = Post.published.annotate(
+                similarity=TrigramSimilarity('title', query),
+            ).filter(similarity__gt=0.1).order_by('-similarity')
+    return render(request,
+                  'blog/post/search.html',
+                  {'form': form,
+                   'query': query,
+                   'results': results})
